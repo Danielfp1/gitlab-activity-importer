@@ -18,8 +18,8 @@ jobs:
           go-version: '1.23.1'
 
       - name: Build
-        run: go build -o importer ./cmd/main.go
-
+        run:  go build -o importer.exe ./cmd/main.go
+        
       - name: Run App
         env:
           BASE_URL: ${{ secrets.BASE_URL }}
