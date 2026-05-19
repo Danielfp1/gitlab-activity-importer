@@ -2,7 +2,7 @@ name: Daily commit sync
 
 on:
   schedule:
-    - cron: '0 15 * * *'
+    - cron: '47 14 * * *'
 
   workflow_dispatch:
 
