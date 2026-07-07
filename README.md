@@ -11,6 +11,7 @@ A tool to transfer your GitLab commit history to GitHub, reflecting your GitLab 
   - [Setup](#setup)
     - [1. Environmental Variables](#1-environmental-variables)
     - [2. Automatic Imports (Recommended)](#2-automatic-imports-recommended)
+    - [Self-hosted runner setup (corporate GitLab)](docs/self-hosted-runner-setup.md)
     - [3. Manual Imports using repository](#3-manual-imports-using-repository)
     - [4. Manual Imports using binary](#4-manual-imports-using-binary)
   - [Local Import (Offline / Repository Backup)](#local-import-offline--repository-backup)
@@ -49,8 +50,11 @@ This tool fetches your commit history from private GitLab repositories and impor
         | `ORIGIN_REPO_URL` | HTTPS URL of your GitHub repository (ensure it has a `.git` extension) |
 
 ### 2. Automatic Imports (Recommended)
-This approach will automatically keep your activity up to date. The program is being run daily at midnight UTC.
-It imports your latest commits and automatically pushes them to specified GitHub repository.
+This approach will automatically keep your activity up to date. The workflow runs daily at midnight UTC via GitHub Actions.
+
+**GitLab on a private corporate network:** the job must run on a **self-hosted runner** installed on a PC or server inside that network. GitHub-hosted runners (`ubuntu-latest`) cannot reach an internal GitLab instance. See [Self-hosted runner setup](docs/self-hosted-runner-setup.md) for architecture, installation, and migration to a new computer.
+
+It imports your latest commits and automatically pushes them to the specified GitHub repository.
 
 To do that follow these steps:
 1. **Fork this repository** to your GitHub account.
@@ -60,10 +64,11 @@ To do that follow these steps:
    - Under **Security**, navigate to **Secrets and variables > Actions**.
      ![Repository Secrets Configuration](assets/image.png)
    - Add the secrets from section [1](#1-environmental-variables):
+4. **Install a self-hosted runner** on a Windows machine that has access to your GitLab (see [docs/self-hosted-runner-setup.md](docs/self-hosted-runner-setup.md)).
 
 
 
-Once these variables are saved in your Repository secrets, your commits will be automatically updated every day.
+Once these steps are complete and the runner is online, your commits will be updated automatically every day.
 
 ### 3. Manual Imports using repository
 >You need to have GO installed on your computer
