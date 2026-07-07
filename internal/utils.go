@@ -11,14 +11,28 @@ import (
 )
 
 func CheckEnvVariables() error {
-	requiredEnvVars := []string{
-		"BASE_URL",
-		"GITLAB_TOKEN",
-		"GITLAB_USERNAME",
-		"GH_USERNAME",
-		"COMMITER_EMAIL",
-		"ORIGIN_REPO_URL",
-		"ORIGIN_TOKEN",
+	var requiredEnvVars []string
+
+	if os.Getenv("LOCAL_REPO_PATH") != "" {
+		// Local mode: GitLab credentials are not needed.
+		requiredEnvVars = []string{
+			"LOCAL_REPO_PATH",
+			"COMMITER_EMAIL",
+			"GH_USERNAME",
+			"ORIGIN_REPO_URL",
+			"ORIGIN_TOKEN",
+		}
+	} else {
+		// GitLab mode: full set of variables required.
+		requiredEnvVars = []string{
+			"BASE_URL",
+			"GITLAB_TOKEN",
+			"GITLAB_USERNAME",
+			"GH_USERNAME",
+			"COMMITER_EMAIL",
+			"ORIGIN_REPO_URL",
+			"ORIGIN_TOKEN",
+		}
 	}
 
 	var missingVars []string

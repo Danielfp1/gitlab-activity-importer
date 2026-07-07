@@ -31,8 +31,46 @@ func OpenOrInitClone() *git.Repository {
 		}
 	} else {
 		log.Println("Opened existing repository.")
+		if err := ensureRemoteURL(repo); err != nil {
+			log.Fatalf("Failed to update remote URL: %v", err)
+		}
 	}
 	return repo
+}
+
+// ensureRemoteURL checks whether the "origin" remote URL matches ORIGIN_REPO_URL
+// and updates it when they differ. This prevents pushes from silently going to
+// a stale repository left over from a previous configuration.
+func ensureRemoteURL(repo *git.Repository) error {
+	expectedURL := os.Getenv("ORIGIN_REPO_URL")
+	if expectedURL == "" {
+		return nil
+	}
+
+	remote, err := repo.Remote("origin")
+	if err != nil {
+		// No origin yet — create it.
+		_, err = repo.CreateRemote(&config.RemoteConfig{
+			Name: "origin",
+			URLs: []string{expectedURL},
+		})
+		return err
+	}
+
+	currentURLs := remote.Config().URLs
+	if len(currentURLs) > 0 && currentURLs[0] == expectedURL {
+		return nil
+	}
+
+	log.Printf("Remote URL mismatch: was %q, updating to %q", currentURLs, expectedURL)
+	if err := repo.DeleteRemote("origin"); err != nil {
+		return fmt.Errorf("failed to delete old remote: %w", err)
+	}
+	_, err = repo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{expectedURL},
+	})
+	return err
 }
 
 func cloneRemoteRepo() (*git.Repository, error) {

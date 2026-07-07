@@ -14,8 +14,11 @@ type Commit struct {
 }
 
 type GitLabUser struct {
-	ID       int    `json:"id"`
-	Username string `json:"username"`
+	ID          int    `json:"id"`
+	Username    string `json:"username"`
+	Email       string `json:"email"`
+	PublicEmail string `json:"public_email"`
+	CommitEmail string `json:"commit_email"`
 }
 
 func (c Commit) Print() {
