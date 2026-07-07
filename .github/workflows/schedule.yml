@@ -8,7 +8,8 @@ on:
 
 jobs:
   build-and-run:
-    runs-on: ubuntu-latest
+    # GitLab is on the corporate intranet — must run on the local self-hosted runner.
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -18,7 +19,7 @@ jobs:
           go-version: '1.23.1'
 
       - name: Build
-        run: go build -o importer ./cmd/main.go
+        run: go build -o importer.exe ./cmd/main.go
 
       - name: Run App
         env:
@@ -29,4 +30,4 @@ jobs:
           COMMITER_EMAIL: ${{ secrets.COMMITER_EMAIL }}
           ORIGIN_REPO_URL: ${{ secrets.ORIGIN_REPO_URL }}
           ORIGIN_TOKEN: ${{ secrets.ORIGIN_TOKEN }}
-        run: ./importer
+        run: .\importer.exe
