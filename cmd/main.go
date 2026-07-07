@@ -94,6 +94,9 @@ func runGitLabMode() {
 
 	log.Printf("Found contributions in %d projects", len(projectIds))
 
+	authorTerms := services.AuthorSearchTerms(gitlabUser)
+	log.Printf("Searching commits using %d author filters: %v", len(authorTerms), authorTerms)
+
 	commitChannel := make(chan []internal.Commit, len(projectIds))
 
 	var wg sync.WaitGroup
@@ -121,7 +124,7 @@ func runGitLabMode() {
 		log.Printf("Imported %v commits.\n", totalCommits)
 	}()
 
-	services.FetchAllCommits(projectIds, os.Getenv("GITLAB_USERNAME"), commitChannel)
+	services.FetchAllCommits(projectIds, authorTerms, commitChannel)
 
 	wg.Wait()
 

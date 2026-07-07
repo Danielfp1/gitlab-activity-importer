@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -110,7 +111,63 @@ func GetUsersProjectsIds(userId int) ([]int, error) {
 	return allProjectIds, nil
 }
 
-func GetProjectCommits(projectId int, gitlabUserName string) ([]internal.Commit, error) {
+// AuthorSearchTerms returns distinct author values used to query GitLab commits.
+// The GitLab API matches author name or email substrings, not always username.
+func AuthorSearchTerms(user internal.GitLabUser) []string {
+	candidates := []string{
+		user.Username,
+		user.Email,
+		user.PublicEmail,
+		user.CommitEmail,
+		os.Getenv("SOURCE_AUTHOR_EMAIL"),
+		os.Getenv("COMMITER_EMAIL"),
+	}
+
+	seen := make(map[string]bool, len(candidates))
+	terms := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		key := strings.ToLower(candidate)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		terms = append(terms, candidate)
+	}
+	return terms
+}
+
+func GetProjectCommits(projectId int, authorTerms []string) ([]internal.Commit, error) {
+	seen := make(map[string]bool)
+	allCommits := make([]internal.Commit, 0)
+
+	for _, author := range authorTerms {
+		commits, err := getProjectCommitsByAuthor(projectId, author)
+		if err != nil {
+			if strings.Contains(err.Error(), "found no commits in project") {
+				continue
+			}
+			return nil, err
+		}
+		for _, commit := range commits {
+			if seen[commit.ID] {
+				continue
+			}
+			seen[commit.ID] = true
+			allCommits = append(allCommits, commit)
+		}
+	}
+
+	if len(allCommits) == 0 {
+		return nil, fmt.Errorf("found no commits in project no.:%v", projectId)
+	}
+	return allCommits, nil
+}
+
+func getProjectCommitsByAuthor(projectId int, author string) ([]internal.Commit, error) {
 	base := os.Getenv("BASE_URL")
 	token := os.Getenv("GITLAB_TOKEN")
 
@@ -119,7 +176,7 @@ func GetProjectCommits(projectId int, gitlabUserName string) ([]internal.Commit,
 	for page := 1; ; {
 		req, err := http.NewRequestWithContext(context.Background(), "GET",
 			fmt.Sprintf("%s/api/v4/projects/%d/repository/commits?author=%s&per_page=100&page=%d",
-				base, projectId, url.QueryEscape(gitlabUserName), page), nil)
+				base, projectId, url.QueryEscape(author), page), nil)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching the commits: %w", err)
 		}
@@ -165,7 +222,7 @@ func GetProjectCommits(projectId int, gitlabUserName string) ([]internal.Commit,
 	return allCommits, nil
 }
 
-func FetchAllCommits(projectIds []int, gitlabUserName string, commitChannel chan []internal.Commit) {
+func FetchAllCommits(projectIds []int, authorTerms []string, commitChannel chan []internal.Commit) {
 	var wg sync.WaitGroup
 	var validCommitsFound atomic.Bool
 
@@ -175,7 +232,7 @@ func FetchAllCommits(projectIds []int, gitlabUserName string, commitChannel chan
 		go func(projId int) {
 			defer wg.Done()
 
-			commits, err := GetProjectCommits(projId, gitlabUserName)
+			commits, err := GetProjectCommits(projId, authorTerms)
 			if err != nil {
 				log.Printf("Error fetching commits for project %d: %v", projId, err)
 				return

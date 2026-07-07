@@ -352,7 +352,7 @@ func TestGetProjectsCommits(t *testing.T) {
 
 			os.Setenv("BASE_URL", mockServer.URL)
 
-			result, err := services.GetProjectCommits(tt.projectId, tt.userName)
+			result, err := services.GetProjectCommits(tt.projectId, []string{tt.userName})
 
 			if tt.expectError {
 				if err == nil {
