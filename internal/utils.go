@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -75,10 +76,23 @@ func SetupEnv() error {
 	return nil
 }
 
-func GetHomeDirectory() string {
+// GetCommitsImporterPath returns the local clone directory for mirrored commits.
+// Priority:
+//  1. COMMITS_IMPORTER_PATH env (explicit override)
+//  2. C:\Repos\commits-importer on Windows (shared path, independent of service user)
+//  3. ~/commits-importer on other platforms
+func GetCommitsImporterPath() string {
+	if custom := strings.TrimSpace(os.Getenv("COMMITS_IMPORTER_PATH")); custom != "" {
+		return filepath.Clean(custom)
+	}
+
+	if runtime.GOOS == "windows" {
+		return filepath.Clean(`C:\Repos\commits-importer`)
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal("Unable to get the user home directory:", err)
 	}
-	return homeDir
+	return filepath.Join(homeDir, "commits-importer")
 }

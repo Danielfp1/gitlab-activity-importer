@@ -18,6 +18,8 @@ func clearEnvVars(t *testing.T) {
 		"COMMITER_EMAIL",
 		"ORIGIN_REPO_URL",
 		"ORIGIN_TOKEN",
+		"COMMITS_IMPORTER_PATH",
+		"LOCAL_REPO_PATH",
 	}
 
 	for _, v := range vars {
@@ -99,4 +101,32 @@ func TestCheckEnvVariables(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetCommitsImporterPath(t *testing.T) {
+	clearEnvVars(t)
+
+	t.Run("uses COMMITS_IMPORTER_PATH when set", func(t *testing.T) {
+		custom := `D:\custom\clone`
+		if err := os.Setenv("COMMITS_IMPORTER_PATH", custom); err != nil {
+			t.Fatalf("failed to set COMMITS_IMPORTER_PATH: %v", err)
+		}
+		defer os.Unsetenv("COMMITS_IMPORTER_PATH")
+
+		got := internal.GetCommitsImporterPath()
+		if got != custom {
+			t.Fatalf("expected %q, got %q", custom, got)
+		}
+	})
+
+	t.Run("default path when env unset", func(t *testing.T) {
+		_ = os.Unsetenv("COMMITS_IMPORTER_PATH")
+		got := internal.GetCommitsImporterPath()
+		if got == "" {
+			t.Fatal("expected non-empty default path")
+		}
+		if !strings.Contains(strings.ToLower(got), "commits-importer") {
+			t.Fatalf("expected path to contain commits-importer, got %q", got)
+		}
+	})
 }

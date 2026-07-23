@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/furmanp/gitlab-activity-importer/internal"
 	"github.com/go-git/go-git/v5"
@@ -16,7 +17,12 @@ import (
 )
 
 func OpenOrInitClone() *git.Repository {
-	repoPath := internal.GetHomeDirectory() + "/commits-importer/"
+	repoPath := internal.GetCommitsImporterPath()
+	log.Printf("Using commits importer path: %s", repoPath)
+
+	if err := os.MkdirAll(filepath.Dir(repoPath), 0o755); err != nil {
+		log.Fatalf("Failed to create parent directory for %s: %v", repoPath, err)
+	}
 
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
@@ -74,10 +80,14 @@ func ensureRemoteURL(repo *git.Repository) error {
 }
 
 func cloneRemoteRepo() (*git.Repository, error) {
-	homeDir := internal.GetHomeDirectory() + "/commits-importer/"
+	repoPath := internal.GetCommitsImporterPath()
 	repoURL := os.Getenv("ORIGIN_REPO_URL")
 
-	repo, err := git.PlainClone(homeDir, false, &git.CloneOptions{
+	if err := os.MkdirAll(filepath.Dir(repoPath), 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create parent directory for %s: %w", repoPath, err)
+	}
+
+	repo, err := git.PlainClone(repoPath, false, &git.CloneOptions{
 		URL: repoURL,
 		Auth: &http.BasicAuth{
 			Username: os.Getenv("GH_USERNAME"),
@@ -88,9 +98,9 @@ func cloneRemoteRepo() (*git.Repository, error) {
 
 	if err != nil {
 		if err == transport.ErrEmptyRemoteRepository {
-			newRepo, initErr := git.PlainInit(homeDir, false)
+			newRepo, initErr := git.PlainInit(repoPath, false)
 			if initErr != nil {
-				_ = os.RemoveAll(homeDir)
+				_ = os.RemoveAll(repoPath)
 				return nil, initErr
 			}
 
@@ -121,8 +131,8 @@ func CreateLocalCommit(repo *git.Repository, commits []internal.Commit) (int, er
 		return 0, fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	repoPath := internal.GetHomeDirectory() + "/commits-importer/"
-	filePath := repoPath + "/readme.md"
+	repoPath := internal.GetCommitsImporterPath()
+	filePath := filepath.Join(repoPath, "readme.md")
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		file, err := os.Create(filePath)
 		if err != nil {

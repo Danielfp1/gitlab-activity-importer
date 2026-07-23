@@ -25,7 +25,7 @@ flowchart TB
     subgraph maquina [máquina na rede corporativa]
         RunnerService[GitHub Actions Runner Service]
         Importer[importer.exe]
-        Clone[clone commits-importer em HOME]
+        Clone[clone em C:\\Repos\\commits-importer]
     end
     subgraph intranet [Intranet]
         GitLab[GitLab self-hosted]
@@ -50,6 +50,7 @@ flowchart TB
 | **Self-hosted runner** | Serviço Windows que escuta jobs do GitHub |
 | **Secrets** | Tokens e URLs injetados pelo GitHub no job (nunca aparecem no log em texto claro) |
 | **Repo destino** | Repositório vazio no GitHub onde os commits espelhados são enviados |
+| **Clone local** | `C:\Repos\commits-importer` (fixixo no Windows; independente do usuário do serviço). Override opcional: secret/env `COMMITS_IMPORTER_PATH` |
 
 ### Workflow atual
 
@@ -81,8 +82,34 @@ O runner fica em escuta contínua (serviço). Quando o GitHub dispara o workflow
 
 - **Go** instalado (o workflow usa `actions/setup-go`, mas ter Go no sistema ajuda em execuções manuais)
 - **Acesso à rede corporativa** ou VPN no momento do job
-- **PC ligado** no horário do cron (`0 0 * * *` = meia-noite UTC)
-- **Serviço do runner** em execução (`Running`)
+- **PC ligado** no horário do cron
+- **Serviço do runner** em execução (`Running`) — assim o GitHub mostra o runner como **Idle**
+- Pasta **`C:\Repos`** gravável pela conta do serviço do runner (o clone local fica em `C:\Repos\commits-importer`)
+
+```powershell
+# Uma vez (como admin): garantir a pasta e permissão de escrita
+New-Item -ItemType Directory -Force -Path C:\Repos | Out-Null
+# Se o serviço roda como outro usuário, conceda Modify nessa pasta a esse usuário
+```
+
+## Manter o runner Idle (serviço Windows)
+
+**Idle** no GitHub = serviço do runner **Running** e online. Não usa Task Scheduler.
+
+1. `Win + R` → `services.msc`
+2. Procure `GitHub Actions Runner (...)`
+3. Status deve ser **Running**; Startup type **Automatic** (para subir após reboot)
+4. Se estiver Stopped: botão direito → **Start**
+
+Ou no PowerShell (admin):
+
+```powershell
+Get-Service | Where-Object DisplayName -like '*GitHub Actions Runner*'
+# Se parado:
+Get-Service | Where-Object DisplayName -like '*GitHub Actions Runner*' | Start-Service
+```
+
+No GitHub: **Settings → Actions → Runners** → status verde **Idle**.
 
 ## Secrets do GitHub
 
@@ -97,6 +124,7 @@ Configure em: **Settings → Secrets and variables → Actions** no fork.
 | `COMMITER_EMAIL` | E-mail verificado no perfil GitHub (grafo de contribuições) |
 | `ORIGIN_REPO_URL` | URL HTTPS do repo destino (com `.git`) |
 | `ORIGIN_TOKEN` | PAT GitHub com permissão de push no repo destino |
+| `COMMITS_IMPORTER_PATH` | *(opcional)* Path do clone local. Padrão no Windows: `C:\Repos\commits-importer` |
 
 **Importante:**
 
@@ -110,7 +138,7 @@ Configure em: **Settings → Secrets and variables → Actions** no fork.
 
 1. Faça fork de [gitlab-activity-importer](https://github.com/furmanp/gitlab-activity-importer) para sua conta
 2. Crie um repositório **vazio** no GitHub para receber os commits espelhados
-3. Configure os 7 secrets listados acima
+3. Configure os secrets listados acima (os 7 obrigatórios; `COMMITS_IMPORTER_PATH` só se quiser outro path)
 4. Confirme que o workflow em `.github/workflows/schedule.yml` usa `runs-on: self-hosted`
 
 ### 2. Instalar o self-hosted runner (Windows)
@@ -213,7 +241,9 @@ go build -o importer.exe .\cmd\main.go
 ## Checklist:
 
 - [ ] Remover runner antigo: **Settings → Actions → Runners → Remove** (na máquina antiga ou pelo GitHub)
-- [ ] Instalar runner na máquina nova (`C:\actions-runner`, serviço Windows)
-- [ ] Confirmar runner **Idle** no GitHub
+- [ ] Instalar runner na máquina nova (`C:\actions-runner`, serviço Windows, Startup **Automatic**)
+- [ ] Serviço **Running** → runner **Idle** no GitHub
+- [ ] Garantir `C:\Repos` gravável pela conta do serviço
 - [ ] Secrets **permanecem** no repo — só recriar se tokens expiraram
-- [ ] Testar com **Run workflow**
+- [ ] Testar com **Run workflow** (log deve mostrar `Using commits importer path: C:\Repos\commits-importer`)
+- [ ] Se precisar resetar estado local: apagar `C:\Repos\commits-importer` (não a pasta do `actions-runner`)
